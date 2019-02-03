@@ -7,91 +7,97 @@
 
 package frc.robot;
 
+import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
-/**
- * The VM is configured to automatically run this class, and to call the
- * functions corresponding to each mode, as described in the TimedRobot
- * documentation. If you change the name of this class or the package after
- * creating this project, you must also update the build.gradle file in the
- * project.
- */
-public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+public class Robot extends TimedRobot
+{
 
-  /**
-   * This function is run when the robot is first started up and should be
-   * used for any initialization code.
-   */
-  @Override
-  public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
-  }
+    private Joystick mLeftFlightStick;
+    private Joystick mRightFlightStick;
+    private Joystick mXboxJoystick;
 
-  /**
-   * This function is called every robot packet, no matter the mode. Use
-   * this for items like diagnostics that you want ran during disabled,
-   * autonomous, teleoperated and test.
-   *
-   * <p>This runs after the mode specific periodic functions, but before
-   * LiveWindow and SmartDashboard integrated updating.
-   */
-  @Override
-  public void robotPeriodic() {
-  }
+    private WPI_TalonSRX mLeftDriveMotor;
+    private WPI_TalonSRX mRightDriveMotor;
+    private DifferentialDrive mDiffDrive;
 
-  /**
-   * This autonomous (along with the chooser code above) shows how to select
-   * between different autonomous modes using the dashboard. The sendable
-   * chooser code works with the Java SmartDashboard. If you prefer the
-   * LabVIEW Dashboard, remove all of the chooser code and uncomment the
-   * getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to
-   * the switch structure below with additional strings. If using the
-   * SendableChooser make sure to add them to the chooser code above as well.
-   */
-  @Override
-  public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
-  }
+    private SendableChooser<DriveMode> mDriveModeSelector;
 
-  /**
-   * This function is called periodically during autonomous.
-   */
-  @Override
-  public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
+    private enum DriveMode
+    {
+        FLIGHT_STICK, XBOX_TANK, XBOX_HALO, XBOX_CHEEZY
     }
-  }
 
-  /**
-   * This function is called periodically during operator control.
-   */
-  @Override
-  public void teleopPeriodic() {
-  }
+    public Robot()
+    {
+        mLeftFlightStick = new Joystick(0);
+        mRightFlightStick = new Joystick(1);
+        mXboxJoystick = new Joystick(2);
 
-  /**
-   * This function is called periodically during test mode.
-   */
-  @Override
-  public void testPeriodic() {
-  }
+        mLeftDriveMotor = new WPI_TalonSRX(3);
+        WPI_TalonSRX leftFollower = new WPI_TalonSRX(1);
+        leftFollower.follow(mLeftDriveMotor);
+
+        mRightDriveMotor = new WPI_TalonSRX(6);
+        WPI_TalonSRX rightFollower = new WPI_TalonSRX(4);
+        rightFollower.follow(mRightDriveMotor);
+
+        mDiffDrive = new DifferentialDrive(mLeftDriveMotor, mRightDriveMotor);
+
+        mDriveModeSelector = new SendableChooser<>();
+        for (DriveMode dm : DriveMode.values())
+        {
+            mDriveModeSelector.addOption(dm.name(), dm);
+        }
+
+        SmartDashboard.putData("Drive Mode", mDriveModeSelector);
+    }
+
+    /**
+     * This function is called periodically during operator control.
+     */
+    @Override
+    public void teleopPeriodic()
+    {
+        DriveMode driveMode = mDriveModeSelector.getSelected();
+        if (driveMode == null)
+        {
+            System.out.println("OH UH, NOTHING SET IN SHUFFLEBOARD");
+            driveMode = DriveMode.FLIGHT_STICK;
+        }
+
+        switch (driveMode)
+        {
+        case FLIGHT_STICK:
+            mDiffDrive.tankDrive(mLeftFlightStick.getY(), mRightFlightStick.getY());
+            break;
+        case XBOX_HALO:
+            mDiffDrive.arcadeDrive(mXboxJoystick.getRawAxis(XboxButtonMap.LEFT_Y_AXIS), mXboxJoystick.getRawAxis(XboxButtonMap.RIGHT_X_AXIS));
+            break;
+        case XBOX_CHEEZY:
+            mDiffDrive.curvatureDrive(mXboxJoystick.getRawAxis(XboxButtonMap.LEFT_Y_AXIS), mXboxJoystick.getRawAxis(XboxButtonMap.RIGHT_X_AXIS),
+                    mXboxJoystick.getRawButton(XboxButtonMap.RB_BUTTON));
+            break;
+        case XBOX_TANK:
+            mDiffDrive.tankDrive(mXboxJoystick.getRawAxis(XboxButtonMap.LEFT_Y_AXIS), mXboxJoystick.getRawAxis(XboxButtonMap.RIGHT_Y_AXIS));
+            break;
+        default:
+            break;
+        }
+
+        System.out.println("Drive Mode : " + driveMode);
+    }
+
+    /**
+     * This function is called periodically during test mode.
+     */
+    @Override
+    public void testPeriodic()
+    {
+    }
 }
